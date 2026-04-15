@@ -128,6 +128,10 @@
   .blog-title { font-size: 0.97rem; font-weight: 500; margin-bottom: 0.45rem; line-height: 1.4; color: var(--text); }
   .blog-excerpt { font-size: 0.84rem; color: var(--muted); line-height: 1.62; flex: 1; }
   .blog-meta { font-size: 0.77rem; color: var(--muted); margin-top: 1rem; }
+  .blog-card-link { text-decoration: none; color: inherit; display: flex; flex-direction: column; height: 100%; }
+  .blog-loading { color: var(--muted); font-size: 0.9rem; padding: 2rem 0; }
+  .blog-substack-btn { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 2rem; font-size: 0.85rem; font-weight: 500; color: var(--accent); border: 1px solid var(--accent); padding: 8px 20px; border-radius: 100px; text-decoration: none; transition: background 0.2s, color 0.2s; }
+  .blog-substack-btn:hover { background: var(--accent); color: #fff; }
 
   #contact { background: var(--surface); border-top: 1px solid var(--border); }
   .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: start; }
@@ -171,6 +175,7 @@
       <li><a href="#skills">Skills</a></li>
       <li><a href="#projects">Projects</a></li>
       <li><a href="#education">Education</a></li>
+      <li><a href="#blogs">Blog</a></li>
       <li><a href="#publications">Publication</a></li>
     </ul>
     <a href="#contact" class="nav-cta" style="margin-right: 2rem;"> Get in touch </a>
@@ -461,6 +466,17 @@
 </section>
 
 
+<section id="blogs">
+  <div class="container fade-in">
+    <p class="section-label">Writing</p>
+    <h2 class="section-title">Blog</h2>
+    <div id="blog-grid" class="blogs-grid">
+      <p class="blog-loading">Loading posts...</p>
+    </div>
+    <a href="https://shubhangi17joshi.substack.com" target="_blank" class="blog-substack-btn">View all on Substack →</a>
+  </div>
+</section>
+
 <section id="contact">
   <div class="container fade-in">
     <p class="section-label">Get in touch</p>
@@ -513,6 +529,49 @@
       el.style.opacity = '1';
     }, 400);
   }, 3000);
+
+  // Fetch Substack posts via RSS
+  const RSS_URL = 'https://shubhangi17joshi.substack.com/feed';
+  const API = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}&count=4&_=${Date.now()}`;
+
+  fetch(API)
+    .then(r => r.json())
+    .then(data => {
+      const grid = document.getElementById('blog-grid');
+      if (!data.items || data.items.length === 0) {
+        // fallback: try allorigins proxy
+        return fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(RSS_URL)}&_=${Date.now()}`)
+          .then(r => r.json())
+          .then(d => {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(d.contents, 'text/xml');
+            const items = [...xml.querySelectorAll('item')].slice(0, 4);
+            if (!items.length) { grid.innerHTML = '<p class="blog-loading">No posts yet — check back soon.</p>'; return; }
+            grid.innerHTML = items.map(item => {
+              const title = item.querySelector('title')?.textContent || '';
+              const link = item.querySelector('link')?.textContent || '#';
+              const desc = item.querySelector('description')?.textContent?.replace(/<[^>]+>/g, '').slice(0, 120) + '…' || '';
+              const date = new Date(item.querySelector('pubDate')?.textContent).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              return `<a href="${link}" target="_blank" class="blog-card"><span class="blog-tag">The Analytics Notebook</span><div class="blog-title">${title}</div><p class="blog-excerpt">${desc}</p><div class="blog-meta">${date}</div></a>`;
+            }).join('');
+          });
+      }
+      grid.innerHTML = data.items.map(post => {
+        const date = new Date(post.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const excerpt = post.description.replace(/<[^>]+>/g, '').slice(0, 120) + '…';
+        const tag = post.categories?.[0] || 'The Analytics Notebook';
+        return `
+          <a href="${post.link}" target="_blank" class="blog-card">
+            <span class="blog-tag">${tag}</span>
+            <div class="blog-title">${post.title}</div>
+            <p class="blog-excerpt">${excerpt}</p>
+            <div class="blog-meta">${date}</div>
+          </a>`;
+      }).join('');
+    })
+    .catch(() => {
+      document.getElementById('blog-grid').innerHTML = '<p class="blog-loading">Could not load posts. <a href="https://shubhangi17joshi.substack.com" target="_blank" style="color:var(--accent)">Visit Substack →</a></p>';
+    });
 </script>
 </body>
 </html>
